@@ -1,0 +1,54 @@
+{
+  "recordedAt": "2026-10-25T14:33:14.067Z",
+  "scope": "Direct provider HTTP reads with minimal response-shape checks; not client integration, browser CORS, artwork rendering or audio playback.",
+  "results": [
+    {
+      "name": "MusicBrainz artist search",
+      "url": "https://musicbrainz.org/ws/2/artist?query=Radiohead&limit=2&fmt=json",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 14,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    },
+    {
+      "name": "MusicBrainz recording search",
+      "url": "https://musicbrainz.org/ws/2/recording?query=Karma%20Police&limit=2&fmt=json",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 11,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    },
+    {
+      "name": "MusicBrainz album search",
+      "url": "https://musicbrainz.org/ws/2/release?query=OK%20Computer&limit=2&fmt=json",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 10,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    },
+    {
+      "name": "Audius track search",
+      "url": "https://api.audius.co/v1/tracks/search?query=ambient&limit=2&offset=0",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 9,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    },
+    {
+      "name": "Audius trending",
+      "url": "https://api.audius.co/v1/tracks/trending?limit=2&offset=0",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 8,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    },
+    {
+      "name": "Cover Art Archive metadata",
+      "url": "https://coverartarchive.org/release/f5093c06-23e3-4f01-9c39-40f85e2d08c3/",
+      "outcome": "BLOCKED",
+      "httpStatus": null,
+      "elapsedMs": 8,
+      "error": "curl: (7) Failed to connect to proxy port 8080 after 0 ms: Could not connect to server"
+    }
+  ]
+}
