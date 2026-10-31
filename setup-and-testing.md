@@ -1,81 +1,74 @@
 # Setup and testing
 
-## 1. Installation
+## Installation and configuration
 
-Requirements: Node.js (current LTS) and npm. Git is needed to clone the repository.
+Use Node.js 22.18+ and npm. From the repository root:
 
 ```sh
-git clone https://github.com/baxodirabdugafforov7newuu/music-lab.git
-cd music-lab
-npm install
+npm ci
 npm run dev
 ```
 
-Vite prints the local address, normally `http://localhost:5173/`. If that port is busy, Vite uses the next free one, so always use the address shown in the terminal.
+Open the address Vite prints (normally `http://localhost:5173`). Leave the server running while using the app. `npm run build` creates static production files in `dist/`; `npm run preview` serves that build locally.
 
-| Command | Result |
-| --- | --- |
-| `npm run dev` | Development server with hot reload |
-| `npm run build` | Type check (`tsc -b`) and production build in `dist/` |
-| `npm run preview` | Serves the `dist/` build locally |
+API settings are optional. Copy `.env.example` to `.env.local` to set the Audius base URL, application name, or public API key. Restart Vite after changes. Build-time settings must also be supplied when building on a hosting service. No API secret is used; do not add one to browser environment variables. MusicBrainz and Cover Art Archive use their public endpoints.
 
-The production build contains static files only, so it can be hosted on any static web host.
-
-## 2. Automated tests
-
-The tests are in `tests/music-api.test.mjs` and use Node's built-in test runner. They check the API client with a mocked `fetch`, so they need no internet connection.
+## Automated checks
 
 ```sh
-node --experimental-transform-types --test tests/music-api.test.mjs
+npm test
+npm run build
+npm run test:e2e
+# Or run the complete sequence:
+npm run check
 ```
 
-Result when the tests were run for this documentation: 7 tests, 7 passed, 0 failed. `npm run build` also completed successfully (19 modules, JavaScript bundle about 239 kB, 75 kB gzipped).
+`npm test` uses Node's native TypeScript support and built-in test runner. No experimental transformation flag is needed. It runs 15 tests across `tests/music-api.test.mjs` and `tests/library.test.mjs`:
 
-| # | Test | What it verifies |
-| --- | --- | --- |
-| 1 | Song search encodes text and normalizes pagination | Quoted query, correct path, result converted to `{ items, total, offset }` |
-| 2 | Artist album browsing preserves provider count | Total count from MusicBrainz is kept; artist ID is sent |
-| 3 | Invalid input makes no request | Bad IDs, empty text and out-of-range `limit` throw errors and no request is sent |
-| 4 | HTTP errors retain status | A 429 response raises `MusicApiError` with `status` 429 |
-| 5 | Audio uses Audius IDs and unwraps data | Audius `data` wrapper is removed; stream URL is built; bad ID is rejected |
-| 6 | Artwork uses release ID and requested size | Cover Art Archive URL has the requested size |
-| 7 | MusicBrainz queues requests even after failure | Two calls start at least 1.05 seconds apart, even when the first fails |
+- MusicBrainz query escaping, pagination, input validation, artwork URLs, and request spacing after errors.
+- Audius response handling, track/profile endpoints, configurable public connection settings, HTTP failures, and timeout cancellation.
+- Stream eligibility, nested storage validation, invalid JSON, unavailable storage, and safe duration formatting.
 
-## 3. Manual test checklist (interface)
+`npm run test:e2e` uses Playwright with Google Chrome. Install Chrome if absent (`npx playwright install chrome`). The test runner starts Vite on `127.0.0.1:5173`. A local server and browser processes must be allowed by your environment.
 
-The interface has no automated tests, so these checks are done by hand. Internet access is required for live music.
+The browser suite runs 13 scenarios on desktop and mobile (26 checks):
 
-| # | Steps | Expected result |
-| --- | --- | --- |
-| 1 | Open the app | Discover page shows trending tracks; status line reads "Live music · Audius" |
-| 2 | Type a word in the search box | View changes to Search; results update after a short delay |
-| 3 | Search for nonsense text such as `zzqxjkvw` | Message "No live results. Try another search." |
-| 4 | Click a track | Track plays; player bar shows its title and artist |
-| 5 | Press pause, then play | Playback stops and resumes |
-| 6 | Drag the seek bar and the volume slider | Position and loudness change |
-| 7 | Turn on shuffle, press next several times | Tracks are chosen in random order |
-| 8 | Set repeat to "one" and let a track finish | The same track starts again |
-| 9 | Add two tracks to the queue, press next | Queued tracks play first, in order |
-| 10 | Like a track, open Your library | The track appears under Liked songs |
-| 11 | Reload the page | Likes, playlists and recently played are still there |
-| 12 | Create a playlist and add a track from the track list | The playlist shows the track; adding it again does not duplicate it |
-| 13 | Turn off the network and reload | Message that live music is unavailable; sample catalog appears; sample tracks show "no audio" message |
-| 14 | Use only the keyboard (Tab, Enter, Space) | All controls can be reached and activated; focus outline is visible |
-| 15 | Narrow the browser window to phone width | Layout switches to the mobile arrangement |
+1. Title/artist search, empty results, and song information.
+2. Slow older searches cannot overwrite newer results.
+3. Artist biography, counts, and playable tracks.
+4. Album metadata, track listing, and “Find audio”.
+5. Persistent likes, case-insensitive playlist names, duplicate prevention, and track removal.
+6. Real audio element play/pause, seeking, volume, queue priority, repeat-one, next after navigation, and history.
+7. Provider failure, sample restrictions, and refresh recovery.
+8. Malformed persisted data cannot crash the interface.
+9. Viewport fit and keyboard skip-link focus.
+10. Gated/unavailable tracks are excluded from playback.
+11. Collections remain usable in memory when browser storage is blocked.
+12. Song information opens the corresponding artist profile directly.
+13. Repeat-all restarts a single-track playback list after the media naturally ends.
 
-## 4. Known test gaps
+Requests are intercepted with deterministic fixtures, including a seekable WAV served with byte-range support. No API key or provider connection is required for automated tests. Failure traces are saved under ignored `test-results/`; inspect them with `npx playwright show-trace <path>`.
 
-- No automated interface tests.
-- Tests use mocked responses. They do not prove that Audius or MusicBrainz are available or that browser (CORS) requests succeed from the deployed address. This should be checked once on the final address.
-- Audio playback depends on the browser and on each track's availability.
+## Live smoke test
 
-## 5. Troubleshooting
+Automated fixtures do not establish external availability or CORS behavior at a deployed address. On the final host:
 
-| Problem | Cause and fix |
+1. Open Discover, confirm live tracks load, and play one permitted track.
+2. Search for a song and artist; open Info and the artist profile.
+3. Search an album, open its track listing, and check its cover or graceful fallback.
+4. Like a track, create a playlist, reload, and confirm both persist.
+5. Check seek, volume, shuffle, repeat, queue removal, and previous/next.
+
+A live Audius trending request was also checked during implementation and returned streamable tracks. Individual streams, metadata, artwork, and provider availability can change.
+
+## Troubleshooting
+
+| Problem | Action |
 | --- | --- |
-| Browser shows `ERR_CONNECTION_REFUSED` for localhost | The dev server is not running. Run `npm run dev` and leave that terminal open |
-| On Windows, "Terminate batch job (Y/N)?" appears | Ctrl+C was pressed and the server has stopped. Start it again; do not press Ctrl+C while using the app |
-| `npm install` or the build reports version errors | Node.js is too old. Install the current LTS version |
-| "Live music unavailable" message | No internet connection, a service outage, or a rate limit (HTTP 429). Wait and try again |
-| A track does not start | The track may be removed or restricted. Choose another track |
-| Likes disappear | Browser data was cleared, or the browser is in private mode and blocks storage |
+| Local connection refused | Run `npm run dev` and use the printed address |
+| Live music unavailable | Check network and API URL; use Refresh music after service recovery |
+| No live results | Try another title or artist; restricted tracks are intentionally excluded |
+| Track fails to start | Press Play again or choose another track; browser autoplay and provider restrictions apply |
+| Album has no cover | A generated placeholder is shown when the image is absent or fails |
+| Collections disappear after closing the browser | Browser data may have been cleared; blocked storage supports session state only |
+| Browser tests cannot launch | Install Google Chrome and allow local server/browser processes |
