@@ -35,9 +35,9 @@ classDiagram
   Playlist o-- Track
 ```
 
-`Track` is defined in `App.tsx` as `AudiusTrack & { album: string; art: string }`. Tracks from Audius get `album = "Audius"` and `art = "blue"`. Sample tracks carry their own album name and color.
+`Track` is defined in `src/library.ts` as `AudiusTrack & { album: string; art: string }`. Tracks from Audius get `album = "Audius"` and `art = "blue"`. Sample tracks carry their own album name and color.
 
-MusicBrainz types (used by the API client, not yet by the interface):
+MusicBrainz types (used by the API client and album interface):
 
 | Type | Fields |
 | --- | --- |
@@ -57,7 +57,7 @@ Units differ between providers: MusicBrainz `length` is in milliseconds, Audius 
 | --- | --- | --- |
 | `music-lab-likes` | Array of track IDs (`string[]`) | Toggled by the heart button |
 | `music-lab-tracks` | Array of full `Track` objects | A track is added when first liked and is not removed on unlike. The library shows only tracks whose ID is in the likes list |
-| `music-lab-playlists` | Array of `{ name, tracks }` | Names are unique and at most 80 characters. A track appears only once per playlist |
+| `music-lab-playlists` | Array of `{ name, tracks }` | Names are trimmed, unique without regard to case, and at most 80 characters. A track appears only once per playlist |
 | `music-lab-history` | Array of `Track`, most recent first | At most 50 entries; playing a track again moves it to the front |
 
 Example of stored data:
@@ -77,7 +77,7 @@ Example of stored data:
 
 ### Loading and failure behavior
 
-When the page loads, each key is read and checked. The value is accepted only if it is an array and every item is either a string or an object that has an `id`, or a `name` together with a `tracks` array. Otherwise the default (an empty list) is used. If reading or writing fails, for example because storage is blocked or full, the app continues with in-memory state.
+When the page loads, each key is read and checked. Each key has a dedicated validator. Likes must be strings. Tracks require a safe alphanumeric ID, title, finite nonnegative duration, album/color, and nested user ID/name/handle. Playlists require a nonempty bounded name and a recursively valid track list. Otherwise the default (an empty list) is used. If reading or writing fails, for example because storage is blocked or full, the app continues with in-memory state.
 
 ## 3. Data that is not stored
 

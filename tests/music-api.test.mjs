@@ -47,3 +47,34 @@ test('MusicBrainz queues requests even after failure', async () => {
   assert.equal(starts.length, 2)
   assert.ok(starts[1] - starts[0] >= 1050)
 })
+
+test('configured Audius URL and public credentials apply to JSON and streams', async () => {
+  const urls = []
+  const api = createMusicApi({ audiusBaseUrl: 'https://example.org/api/v1', appName: 'Music Lab', apiKey: 'public-key', fetch: async url => { urls.push(new URL(url)); return Response.json({ data: [] }) } })
+  await api.audio.trending({ limit: 5 })
+  assert.equal(urls[0].pathname, '/api/v1/tracks/trending')
+  assert.equal(urls[0].searchParams.get('app_name'), 'Music Lab')
+  const stream = new URL(api.audio.streamUrl('abc12'))
+  assert.equal(stream.pathname, '/api/v1/tracks/abc12/stream')
+  assert.equal(stream.searchParams.get('api_key'), 'public-key')
+  assert.throws(() => createMusicApi({ audiusBaseUrl: 'file:///tmp/api' }), TypeError)
+})
+test('artist profile and track endpoints preserve Audius IDs', async () => {
+  const { api, urls } = mock({ data: [] })
+  await api.users.search('artist')
+  await api.users.get('abc12')
+  await api.users.tracks('abc12', { limit: 50 })
+  assert.deepEqual(urls.map(u => u.pathname), ['/v1/users/search', '/v1/users/abc12', '/v1/users/abc12/tracks'])
+  assert.throws(() => api.users.get('../bad'), TypeError)
+})
+test('malformed provider responses are reported as API errors', async () => {
+  await assert.rejects(mock({ error: 'missing data' }).api.audio.trending(), MusicApiError)
+})
+test('network failures and timeouts propagate without losing the request signal', async () => {
+  const api = createMusicApi({ timeoutMs: 5, fetch: async (_url, init) => new Promise((_, reject) => {
+    assert.ok(init.signal)
+    const timer = setTimeout(() => reject(new Error('signal did not abort')), 100)
+    init.signal.addEventListener('abort', () => { clearTimeout(timer); reject(init.signal.reason) })
+  }) })
+  await assert.rejects(api.audio.trending(), error => error.name === 'TimeoutError')
+})

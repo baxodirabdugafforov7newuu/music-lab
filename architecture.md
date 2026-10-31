@@ -13,7 +13,7 @@ Main technologies:
 | Build tool | Vite 8 |
 | Audio playback | The browser's built-in `<audio>` element |
 | Persistence | `localStorage` through a custom hook |
-| Tests | Node's built-in test runner, with a mocked `fetch` |
+| Tests | Node test runner for API/storage, Playwright for desktop/mobile UI |
 
 ## 2. System context
 
@@ -27,11 +27,11 @@ flowchart LR
   UI --> Audio[HTML audio element]
   Audio -->|stream URL| Audius
   UI --> Demo[Sample data<br/>demo.ts]
-  API -.->|implemented, not used by the UI yet| MB[(MusicBrainz)]
-  API -.->|implemented, not used by the UI yet| CAA[(Cover Art Archive)]
+  API -->|album search and track listings| MB[(MusicBrainz)]
+  UI -->|cover image URLs| CAA[(Cover Art Archive)]
 ```
 
-Solid lines are used by the running application. Dashed lines are implemented in the API client but are not yet connected to any screen.
+All three providers are connected to the running application. MusicBrainz metadata is kept separate from Audius audio identifiers.
 
 ## 3. Layers and components
 
@@ -45,7 +45,7 @@ Solid lines are used by the running application. Dashed lines are implemented in
 
 ### 3.1 User interface (`App.tsx`)
 
-`App` is one component that contains the whole interface. It renders:
+`App` coordinates the interface and delegates catalog browsing, song information, and media artwork to `Catalog`, `SongDetails`, and `Artwork`. It renders:
 
 - a sidebar with navigation (Discover, Search, Your library) and a liked-songs shortcut
 - a top bar with the search box
@@ -58,7 +58,7 @@ Key functions:
 | --- | --- |
 | `navigate(view)` | Switches view and resets search text, filter, and selected album, artist and playlist |
 | `selectTrack(id)` | Finds the track in all known lists, sets it as current, starts playback and records it in history (at most 50 entries, no duplicates). Sample tracks (IDs starting with `demoAudio`) have no audio, so only a message is shown |
-| `skip(direction, ended)` | Chooses the next track. Order of priority: repeat-one restarts the track, then the queue, then the visible list (random choice if shuffle is on). With repeat off, playback stops at the end of the list |
+| `skip(direction, ended)` | Chooses the next track. Order of priority: repeat-one restarts the track, then the queue, then the playback list captured when a song was selected (random choice if shuffle is on). With repeat off, playback stops at the end of the list |
 | `toggleLike(id)` | Adds or removes the track ID in the liked list and stores the full track object so it can be shown in the library later |
 | `addToPlaylist(name, track)` | Adds a track to a playlist unless it is already there |
 
@@ -79,8 +79,9 @@ All other state (current view, queue, volume, playback position) is plain React 
 | `albums` | MusicBrainz | `search`, `get` |
 | `artwork` | Cover Art Archive | `frontUrl` |
 | `audio` | Audius | `search`, `trending`, `get`, `streamUrl` |
+| `users` | Audius | `search`, `get`, `tracks` |
 
-The module exports one shared instance, `musicApi`. The app uses only the `audio` group.
+The module exports one shared instance, `musicApi`. The app uses `audio` and `users` for playable songs/profiles, `albums` for catalog releases/track listings, and `artwork` for cover URLs.
 
 Design points of the client:
 
@@ -152,11 +153,11 @@ The full track object is stored, not only the ID, because the library must be ab
 
 ## 6. Security and privacy
 
-- No API keys or secrets are used. The API documentation advises against putting secrets in `VITE_` variables because Vite includes them in the public bundle.
+- No API secrets are used. A public Audius API key, app name, and base URL can optionally be configured in `.env.local`. The API documentation advises against putting secrets in `VITE_` variables because Vite includes them in the public bundle.
 - All user input that becomes part of a URL or query is validated or escaped.
 - React escapes text it renders, which protects against script injection through track titles.
 - The app stores no personal data on a server. Liked songs, playlists and history stay in the user's browser.
-- Third-party requests go to the Audius domains. Their terms and attribution requirements apply.
+- Third-party requests go to Audius, MusicBrainz, Cover Art Archive, and provider image/media hosts. Their terms and attribution requirements apply.
 
 ## 7. Accessibility
 
@@ -164,20 +165,16 @@ The interface has a "Skip to music" link, labelled controls (for example Previou
 
 ## 8. Known limitations
 
-- The interface is one large component, which makes it harder to maintain and test.
-- Albums and artists on the Discover page are sample data. Clicking one filters the sample tracks, which have no audio.
-- MusicBrainz and Cover Art Archive are not connected to the interface yet.
+- Album metadata does not imply an available audio match; “Find audio” searches Audius separately.
 - There are no user accounts. Data is per browser.
 - Rate limiting is per browser tab. It does not coordinate several tabs or several users behind one network address.
 - Failed requests are not retried automatically.
-- Automated tests cover only the API client; the interface is checked manually.
+- Automated tests use deterministic providers; external availability and deployed CORS still need a live smoke test.
 - The app depends on third-party services being online and allowing browser requests.
 
 ## 9. Possible future work
 
 - Split `App.tsx` into smaller components (player bar, track list, sidebar, library).
-- Show live artists, albums and cover art from MusicBrainz and Cover Art Archive.
 - Add routing so each view has its own address.
 - Add user accounts and server-side storage for playlists.
 - Add a small proxy server that shares rate limiting and caching for all users.
-- Add interface tests.

@@ -5,14 +5,20 @@ export interface Song { id: string; title: string; length?: number; 'artist-cred
 export interface Album { id: string; title: string; date?: string; 'artist-credit'?: Credit[] }
 export interface Page<T> { items: T[]; total: number; offset: number }
 export interface SearchOptions { limit?: number; offset?: number }
-export interface AudiusUser { id: string; name: string; handle: string }
+export interface AudiusUser {
+  id: string; name: string; handle: string; bio?: string; location?: string;
+  follower_count?: number; track_count?: number; profile_picture?: Record<string, string> | null;
+}
 export interface AudiusTrack {
   id: string; title: string; duration: number; user: AudiusUser;
   is_streamable?: boolean; is_stream_gated?: boolean;
   artwork?: Record<string, string> | null;
+  description?: string; genre?: string; mood?: string; release_date?: string;
+  play_count?: number; permalink?: string; is_available?: boolean;
 }
 export class MusicApiError extends Error {
-  constructor(message: string, public status?: number) { super(message); this.name = 'MusicApiError' }
+  status?: number
+  constructor(message: string, status?: number) { super(message); this.name = 'MusicApiError'; this.status = status }
 }
 const mbid = (id: string) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new TypeError('Expected a MusicBrainz UUID')
@@ -26,8 +32,11 @@ function pagination({ limit = 20, offset = 0 }: SearchOptions = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) throw new RangeError('limit must be 1–100; offset must be a nonnegative integer')
   return { limit: String(limit), offset: String(offset) }
 }
-export function createMusicApi(options: { fetch?: typeof fetch; timeoutMs?: number } = {}) {
+export function createMusicApi(options: { fetch?: typeof fetch; timeoutMs?: number; audiusBaseUrl?: string; appName?: string; apiKey?: string } = {}) {
   const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis)
+  const base = new URL(options.audiusBaseUrl ?? 'https://api.audius.co/v1/')
+  if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) throw new TypeError('Expected an HTTP API base URL without credentials, query or fragment')
+  base.pathname = base.pathname.replace(/\/?$/, '/')
   let queue: Promise<unknown> = Promise.resolve()
   let lastStart = 0
   async function json<T>(url: URL): Promise<T> {
@@ -59,9 +68,15 @@ export function createMusicApi(options: { fetch?: typeof fetch; timeoutMs?: numb
     return id
   }
   async function audius<T>(path: string, params: Record<string, string> = {}) {
-    const url = new URL(`https://api.audius.co/v1/${path}`)
-    url.search = new URLSearchParams(params).toString()
-    return (await json<{ data: T }>(url)).data
+    const url = audiusUrl(path, params)
+    const result = await json<{ data: T }>(url)
+    if (result.data === undefined || result.data === null) throw new MusicApiError('Music provider returned invalid data')
+    return result.data
+  }
+  function audiusUrl(path: string, params: Record<string, string> = {}) {
+    const url = new URL(path, base)
+    url.search = new URLSearchParams({ ...(options.appName ? { app_name: options.appName } : {}), ...(options.apiKey ? { api_key: options.apiKey } : {}), ...params }).toString()
+    return url
   }
   return {
     songs: {
@@ -88,9 +103,18 @@ export function createMusicApi(options: { fetch?: typeof fetch; timeoutMs?: numb
       search: (query: string, opts?: SearchOptions) => audius<AudiusTrack[]>('tracks/search', { query: text(query), ...pagination(opts) }),
       trending: (opts?: SearchOptions) => audius<AudiusTrack[]>('tracks/trending', pagination(opts)),
       get: (id: string) => audius<AudiusTrack>(`tracks/${audiusId(id)}`),
-      streamUrl: (id: string) => `https://api.audius.co/v1/tracks/${audiusId(id)}/stream`,
+      streamUrl: (id: string) => audiusUrl(`tracks/${audiusId(id)}/stream`).href,
+    },
+    users: {
+      search: (query: string, opts?: SearchOptions) => audius<AudiusUser[]>('users/search', { query: text(query), ...pagination(opts) }),
+      get: (id: string) => audius<AudiusUser>(`users/${audiusId(id)}`),
+      tracks: (id: string, opts?: SearchOptions) => audius<AudiusTrack[]>(`users/${audiusId(id)}/tracks`, pagination(opts)),
     },
   }
 }
 // Share this singleton across screens to preserve MusicBrainz rate limiting.
-export const musicApi = createMusicApi()
+export const musicApi = createMusicApi({
+  audiusBaseUrl: import.meta.env?.VITE_AUDIUS_API_URL || undefined,
+  appName: import.meta.env?.VITE_AUDIUS_APP_NAME || undefined,
+  apiKey: import.meta.env?.VITE_AUDIUS_API_KEY || undefined,
+})

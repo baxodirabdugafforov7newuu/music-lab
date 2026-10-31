@@ -30,11 +30,11 @@ Status column: **Done** means implemented and present in the code; **Partial** m
 | FR-11 | The system shall let the user create playlists with unique names (up to 80 characters) and add tracks to them | Done |
 | FR-12 | The system shall list the last 50 played tracks | Done |
 | FR-13 | The system shall keep likes, playlists and history after the page is reloaded | Done |
-| FR-14 | The system shall filter content by type (All, Songs, Albums, Artists) | Partial: albums and artists come from sample data |
+| FR-14 | The system shall filter content by type (All, Songs, Albums, Artists) | Done: live Audius tracks/artists and MusicBrainz albums |
 | FR-15 | The system shall show a clear message and a sample catalog when live music cannot be loaded | Done |
-| FR-16 | The system shall show album and artist information from a live source | Not done: client code exists, interface not connected |
-| FR-17 | The system shall show album cover images | Not done: URL builder exists, interface uses generated colors |
-| FR-18 | The system shall let users log in and keep data across devices | Not done |
+| FR-16 | The system shall show album and artist information from a live source | Done: album details/track listings and Audius artist profiles connected |
+| FR-17 | The system shall show album cover images | Done: provider artwork and Cover Art Archive, with generated fallback |
+| FR-18 | The system shall let users log in and keep data across devices | Out of scope: requires accounts and a backend |
 
 ## 4. Non-functional requirements
 
